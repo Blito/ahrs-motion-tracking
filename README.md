@@ -10,7 +10,7 @@
 ### In Windows (MinGW)
 To build:
 
-    git clone <repository url>
+    git clone <repository url> --recursive
     cd <repository folder>
     mkdir build && cd build
     cmake .. -G "MinGW Makefiles"
