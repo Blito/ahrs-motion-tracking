@@ -34,9 +34,11 @@ protected:
     void update_loop();
     bool connect();
 
-    glm::quat orientation;
     WithRobot::MyAhrsPlus sensor;
     WithRobot::SensorData sensor_data;
+
+    glm::vec3 last_accel_read, acceleration, velocity, position;
+    float sensitivity_threshold = 0.7f;
 
     // Internal timers
     std::chrono::time_point<std::chrono::high_resolution_clock> to_sleep_time, process_start_time;

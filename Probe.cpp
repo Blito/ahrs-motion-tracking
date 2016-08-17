@@ -1,13 +1,16 @@
 #include "Probe.h"
 
 Probe::Probe(const std::string & port_name, int baud_rate) :
-    orientation(1.0f,0.0f,0.0f,0.0f),
     sensor(),
     sensor_data(),
-    should_terminate(false),
-    port_name(port_name),
-    baud_rate(baud_rate),
-    connected(false)
+    last_accel_read{},
+    acceleration{},
+    velocity{},
+    position{},
+    should_terminate{false},
+    port_name{port_name},
+    baud_rate{baud_rate},
+    connected{false}
 {}
 
 void Probe::run()
@@ -56,12 +59,29 @@ bool Probe::connect()
 
 void Probe::update(float ellapsed_time_in_millis)
 {
+    float dt = ellapsed_time_in_millis / 1000.0f;
+
     sensor.get_data(sensor_data);
-    WithRobot::Quaternion& q = sensor_data.quaternion;
-    orientation.w = q.w;
-    orientation.x = q.x;
-    orientation.y = q.y;
-    orientation.z = q.z;
+    WithRobot::Quaternion& sensor_orientation = sensor_data.quaternion;
+    WithRobot::ImuData<float>& imu_data = sensor_data.imu;
+
+    glm::vec3 accel_local(imu_data.ax, imu_data.ay, imu_data.az);
+    glm::quat orientation(sensor_orientation.w, sensor_orientation.x, sensor_orientation.y, sensor_orientation.z);
+
+    glm::vec3 accel_world = orientation * accel_local;
+
+    glm::vec3 gravity_vector{0.0, 0.0, -1.0};
+
+    accel_world -= gravity_vector;
+
+    if (std::abs(accel_world.x) < sensitivity_threshold) { accel_world.x = 0.0f; }
+    if (std::abs(accel_world.y) < sensitivity_threshold) { accel_world.y = 0.0f; }
+    if (std::abs(accel_world.z) < sensitivity_threshold) { accel_world.z = 0.0f; }
+
+    velocity += 9.81f * accel_world * dt;
+    position += velocity * dt;
+
+    std::cout << position.x << " " << position.y << " " << position.z << std::endl;
 }
 
 void Probe::update_loop()
@@ -71,20 +91,11 @@ void Probe::update_loop()
     std::cout << "update_loop start" << std::endl;
 
     to_sleep_time = high_resolution_clock::now();
-    int i = 0;
     while (connected && !should_terminate)
     {
-        if (i == 100)
-        {
-            std::cout << orientation.w << " "
-                      << orientation.x << " "
-                      << orientation.y << " "
-                      << orientation.z << std::endl;
-            i = 0;
-        }
         // Measure processing time
         process_start_time = high_resolution_clock::now();
-        auto time_since_last_process = duration_cast<milliseconds>(to_sleep_time - process_start_time);
+        auto time_since_last_process = duration_cast<milliseconds>(process_start_time - to_sleep_time);
 
         // Process data
         update(time_since_last_process.count());
@@ -93,7 +104,6 @@ void Probe::update_loop()
         to_sleep_time = high_resolution_clock::now();
         auto process_duration = duration_cast<milliseconds>(to_sleep_time - process_start_time);
         std::this_thread::sleep_for(polling_interval_duration - process_duration);
-        i++;
     }
 
     std::cout << "update_loop end" << std::endl;

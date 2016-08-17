@@ -16,7 +16,7 @@ int main(int argc, char const *argv[])
 
     auto start = steady_clock::now();
 
-    auto run_duration = 5s;
+    auto run_duration = 120s;
 
     while (steady_clock::now() - start < run_duration)
     {
